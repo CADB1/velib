@@ -1,0 +1,8 @@
+create table meteo (moment timestamp
+             ,clouds int
+            ,description text
+            ,humidity int
+            ,pressure int
+            ,temperature float
+            ,wind float
+            ,primary key (moment));
