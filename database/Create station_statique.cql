@@ -4,7 +4,7 @@ create table station_statique (number int
 			,address text
 			,name text
 			,bonus boolean
-			,latitude float
-			,longitude float
-    	,banking boolean
-      ,primary key (number));
+			,latitude text
+			,longitude text
+    		,banking boolean
+    		,primary key (number));
