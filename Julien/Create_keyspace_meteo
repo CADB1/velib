@@ -1,0 +1,13 @@
+CREATE KEYSPACE IF NOT EXISTS velib_db_test
+       WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor': 1};
+
+use velib_db_test;
+
+create table meteo_test (moment timestamp
+             ,clouds int
+            ,description text
+            ,humidity int
+            ,pressure int
+            ,temperature float
+            ,wind float
+,primary key (moment));

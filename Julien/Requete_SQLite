@@ -1,0 +1,1 @@
+select nb_velo_dispo, last_update, last_update_date from station_dyn where last_update_date = ('2017-03-28') and num = 15003 order by last_update
